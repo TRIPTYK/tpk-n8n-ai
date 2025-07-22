@@ -1,1 +1,6 @@
 .env
+backups
+shared
+n8n_dump.sql.gz
+n8n_dump.sql
+.DS_Store

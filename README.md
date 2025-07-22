@@ -1,228 +1,253 @@
-# Self-hosted AI starter kit
+# n8n AI Docker Environment
 
-**Self-hosted AI Starter Kit** is an open-source Docker Compose template designed to swiftly initialize a comprehensive local AI and low-code development environment.
+## Overview
 
-![n8n.io - Screenshot](https://raw.githubusercontent.com/n8n-io/self-hosted-ai-starter-kit/main/assets/n8n-demo.gif)
+This Docker project provides a complete self-hosted AI development environment with the following components:
 
-Curated by <https://github.com/n8n-io>, it combines the self-hosted n8n
-platform with a curated list of compatible AI products and components to
-quickly get started with building self-hosted AI workflows.
+- **n8n**: A workflow automation platform that connects various services and APIs, providing a low-code interface for building AI-powered workflows
+- **PostgreSQL**: A powerful, open-source relational database used by n8n to store workflows, credentials, and execution data
+- **Qdrant**: A vector database for efficient similarity search and AI embeddings storage
+- **Ollama**: A framework for running large language models locally, enabling AI capabilities without relying on external APIs
+- **Deepseek Coder**: A specialized code generation model (6.7B parameters) designed for programming tasks
 
-> [!TIP]
-> [Read the announcement](https://blog.n8n.io/self-hosted-ai/)
+This documentation covers how to manage this environment, with focus on:
 
-### What’s included
+- Installation and setup of the complete environment
+- Connecting to PostgreSQL from external tools like TablePlus
+- Backing up your n8n database
+- Restoring your n8n database from backups
 
-✅ [**Self-hosted n8n**](https://n8n.io/) - Low-code platform with over 400
-integrations and advanced AI components
+### System Architecture
 
-✅ [**Ollama**](https://ollama.com/) - Cross-platform LLM platform to install
-and run the latest local LLMs
+The following diagram illustrates how the components connect together:
 
-✅ [**Qdrant**](https://qdrant.tech/) - Open-source, high performance vector
-store with an comprehensive API
+```
+┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
+│                 │     │                 │     │                 │
+│     Client      │     │      n8n        │     │     Ollama      │
+│     Browser     ├────►│   Workflow      ├────►│   LLM Server    │
+│                 │     │   Automation    │     │   (llama3.2)    │
+│                 │     │                 │     │   (deepseek)    │
+└─────────────────┘     └────────┬────────┘     └─────────────────┘
+                                 │
+                                 │
+                                 ▼
+                        ┌─────────────────┐     ┌─────────────────┐
+                        │                 │     │                 │
+                        │   PostgreSQL   │     │     Qdrant      │
+                        │   Database     │     │   Vector DB     │
+                        │                 │     │                 │
+                        └─────────────────┘     └─────────────────┘
+```
 
-✅ [**PostgreSQL**](https://www.postgresql.org/) -  Workhorse of the Data
-Engineering world, handles large amounts of data safely.
-
-### What you can build
-
-⭐️ **AI Agents** for scheduling appointments
-
-⭐️ **Summarize Company PDFs** securely without data leaks
-
-⭐️ **Smarter Slack Bots** for enhanced company communications and IT operations
-
-⭐️ **Private Financial Document Analysis** at minimal cost
+In this architecture:
+- **n8n** is the central workflow automation platform that orchestrates all components
+- **PostgreSQL** stores n8n workflows, credentials, and execution data
+- **Ollama** provides local LLM capabilities with models like llama3.2 and deepseek-coder
+- **Qdrant** stores vector embeddings for similarity search and AI applications
+- All components run in Docker containers with proper networking
 
 ## Installation
 
-### Cloning the Repository
+### Prerequisites
 
-```bash
-git clone https://github.com/n8n-io/self-hosted-ai-starter-kit.git
-cd self-hosted-ai-starter-kit
-cp .env.example .env # you should update secrets and passwords inside
+- Docker and Docker Compose installed on your system
+- Git (optional, for cloning the repository)
+
+### Shared Files
+
+This project includes a shared folder that allows you to share files between your host machine and the n8n container:
+
+- **Host location**: `./shared` (in the project root)
+- **Container location**: `/data/shared` (inside the n8n container)
+
+You can place any files in the `./shared` directory that you want n8n to be able to read or write. This is useful for:
+
+- Input files for n8n workflows
+- Output files generated by n8n workflows
+- Configuration files
+- Data files for processing
+
+### Setup Steps
+
+1. **Clone or download the repository**
+
+   ```bash
+   git clone https://github.com/TRIPTYK/tpk-n8n-ai.git
+   cd tpk-n8n-ai
+   ```
+
+2. **Configure environment variables**
+
+   Create a `.env` file in the project root or copy from the example:
+
+   ```bash
+   cp .env.example .env
+   ```
+
+   Edit the `.env` file to set your PostgreSQL credentials:
+
+   ```
+   POSTGRES_USER=root
+   POSTGRES_PASSWORD=password
+   POSTGRES_DB=n8n
+   ```
+
+3. **Start the environment**
+
+   ```bash
+   docker-compose up --profile=cpu -d
+   ```
+
+   This will start all services including PostgreSQL, n8n, and other required components.
+
+4. **Verify PostgreSQL is running**
+
+   ```bash
+   docker ps | grep postgres
+   ```
+
+   You should see the PostgreSQL container running with port 5432 exposed.
+
+## Database Management
+
+### Connecting to PostgreSQL from External Tools
+
+The PostgreSQL database is configured to be accessible from external tools like TablePlus, pgAdmin, or any other PostgreSQL client. This allows you to directly interact with your database for debugging, data exploration, or manual modifications.
+
+#### Connection Details
+
+```
+Host: localhost (or 127.0.0.1)
+Port: 5432
+Username: root (or the value in your .env file's POSTGRES_USER)
+Password: password (or the value in your .env file's POSTGRES_PASSWORD)
+Database: n8n (or the value in your .env file's POSTGRES_DB)
 ```
 
-### Running n8n using Docker Compose
+#### Connection Diagram
 
-#### For Nvidia GPU users
-
-```bash
-git clone https://github.com/n8n-io/self-hosted-ai-starter-kit.git
-cd self-hosted-ai-starter-kit
-cp .env.example .env # you should update secrets and passwords inside
-docker compose --profile gpu-nvidia up
+```
+┌─────────────────┐      ┌─────────────────┐
+│                 │      │                 │
+│  TablePlus or   │      │   PostgreSQL    │
+│  other DB tool  ├─────►│   Container     │
+│  on your Mac    │      │   (port 5432)   │
+│                 │      │                 │
+└─────────────────┘      └─────────────────┘
 ```
 
-> [!NOTE]
-> If you have not used your Nvidia GPU with Docker before, please follow the
-> [Ollama Docker instructions](https://github.com/ollama/ollama/blob/main/docs/docker.md).
+### Database Backup and Restore
 
-### For AMD GPU users on Linux
+To ensure data safety and enable migration between environments, this project includes scripts for backing up and restoring your n8n database. These scripts connect directly to the PostgreSQL Docker container, so you don't need to have PostgreSQL installed on your host machine.
 
-```bash
-git clone https://github.com/n8n-io/self-hosted-ai-starter-kit.git
-cd self-hosted-ai-starter-kit
-cp .env.example .env # you should update secrets and passwords inside
-docker compose --profile gpu-amd up
-```
+#### Backup Script
 
-#### For Mac / Apple Silicon users
+The `backup_n8n_db.sh` script creates a backup of your PostgreSQL database directly from the Docker container.
 
-If you’re using a Mac with an M1 or newer processor, you can't expose your GPU
-to the Docker instance, unfortunately. There are two options in this case:
-
-1. Run the starter kit fully on CPU, like in the section "For everyone else"
-   below
-2. Run Ollama on your Mac for faster inference, and connect to that from the
-   n8n instance
-
-If you want to run Ollama on your mac, check the
-[Ollama homepage](https://ollama.com/)
-for installation instructions, and run the starter kit as follows:
+**Usage:**
 
 ```bash
-git clone https://github.com/n8n-io/self-hosted-ai-starter-kit.git
-cd self-hosted-ai-starter-kit
-cp .env.example .env # you should update secrets and passwords inside
-docker compose up
+./backup_n8n_db.sh
 ```
 
-##### For Mac users running OLLAMA locally
+**What it does:**
 
-If you're running OLLAMA locally on your Mac (not in Docker), you need to modify the OLLAMA_HOST environment variable
+1. Connects to the PostgreSQL container
+2. Creates a SQL dump of your n8n database
+3. Saves the backup to a `backups` directory with a timestamp
+4. Creates both uncompressed (.sql) and compressed (.gz) versions
 
-1. Set OLLAMA_HOST to `host.docker.internal:11434` in your .env file. 
-2. Additionally, after you see "Editor is now accessible via: <http://localhost:5678/>":
+**Example output:**
 
-    1. Head to <http://localhost:5678/home/credentials>
-    2. Click on "Local Ollama service"
-    3. Change the base URL to "http://host.docker.internal:11434/"
+```
+Loading environment variables from .env file...
+Starting PostgreSQL backup of n8n database...
+Using database: n8n
+Using username: root
+Backup will be saved to: /path/to/project/backups/n8n_backup_20250722_115054.sql
+Using PostgreSQL container: tpk-n8n-ai-postgres-1
+Backup completed successfully!
+Backup saved to: /path/to/project/backups/n8n_backup_20250722_115054.sql
+Compressed backup saved to: /path/to/project/backups/n8n_backup_20250722_115054.sql.gz
+Done!
+```
 
-#### For everyone else
+#### Restore Script
+
+The `restore_n8n_db.sh` script restores your database from a previously created backup.
+
+**Usage:**
 
 ```bash
-git clone https://github.com/n8n-io/self-hosted-ai-starter-kit.git
-cd self-hosted-ai-starter-kit
-cp .env.example .env # you should update secrets and passwords inside
-docker compose --profile cpu up
+./restore_n8n_db.sh path/to/backup.sql
+# OR
+./restore_n8n_db.sh path/to/backup.sql.gz
 ```
 
-## ⚡️ Quick start and usage
+**What it does:**
 
-The core of the Self-hosted AI Starter Kit is a Docker Compose file, pre-configured with network and storage settings, minimizing the need for additional installations.
-After completing the installation steps above, simply follow the steps below to get started.
+1. Stops the n8n container to prevent connection issues
+2. Drops the existing database and creates a fresh one
+3. Restores the database from your backup file
+4. Restarts the n8n container
 
-1. Open <http://localhost:5678/> in your browser to set up n8n. You’ll only
-   have to do this once.
-2. Open the included workflow:
-   <http://localhost:5678/workflow/srOnR8PAY3u4RSwb>
-3. Click the **Chat** button at the bottom of the canvas, to start running the workflow.
-4. If this is the first time you’re running the workflow, you may need to wait
-   until Ollama finishes downloading Llama3.2. You can inspect the docker
-   console logs to check on the progress.
-
-To open n8n at any time, visit <http://localhost:5678/> in your browser.
-
-With your n8n instance, you’ll have access to over 400 integrations and a
-suite of basic and advanced AI nodes such as
-[AI Agent](https://docs.n8n.io/integrations/builtin/cluster-nodes/root-nodes/n8n-nodes-langchain.agent/),
-[Text classifier](https://docs.n8n.io/integrations/builtin/cluster-nodes/root-nodes/n8n-nodes-langchain.text-classifier/),
-and [Information Extractor](https://docs.n8n.io/integrations/builtin/cluster-nodes/root-nodes/n8n-nodes-langchain.information-extractor/)
-nodes. To keep everything local, just remember to use the Ollama node for your
-language model and Qdrant as your vector store.
-
-> [!NOTE]
-> This starter kit is designed to help you get started with self-hosted AI
-> workflows. While it’s not fully optimized for production environments, it
-> combines robust components that work well together for proof-of-concept
-> projects. You can customize it to meet your specific needs
-
-## Upgrading
-
-* ### For Nvidia GPU setups:
+**Example:**
 
 ```bash
-docker compose --profile gpu-nvidia pull
-docker compose create && docker compose --profile gpu-nvidia up
+./restore_n8n_db.sh backups/n8n_backup_20250722_115054.sql.gz
 ```
 
-* ### For Mac / Apple Silicon users
+#### Backup and Restore Flow Diagram
 
-```bash
-docker compose pull
-docker compose create && docker compose up
+```
+┌─────────────┐     ┌─────────────┐     ┌─────────────┐
+│             │     │             │     │             │
+│  n8n with   │     │  Backup     │     │  Backup     │
+│  PostgreSQL ├────►│  Script     ├────►│  Files      │
+│  Database   │     │             │     │  (.sql/.gz) │
+│             │     │             │     │             │
+└──────┬──────┘     └─────────────┘     └──────┬──────┘
+       │                                        │
+       │                                        │
+       │      ┌─────────────┐                  │
+       │      │             │                  │
+       └─────►│  Restore    │◄─────────────────┘
+              │  Script     │
+              │             │
+              └─────────────┘
 ```
 
-* ### For Non-GPU setups:
+### Best Practices
 
-```bash
-docker compose --profile cpu pull
-docker compose create && docker compose --profile cpu up
+#### Backup and Restore Flow Diagram
+
+```
+┌─────────────┐     ┌─────────────┐     ┌─────────────┐
+│             │     │             │     │             │
+│  n8n with   │     │  Backup     │     │  Backup     │
+│  PostgreSQL ├────►│  Script     ├────►│  Files      │
+│  Database   │     │             │     │  (.sql/.gz) │
+│             │     │             │     │             │
+└──────┬──────┘     └─────────────┘     └──────┬──────┘
+       │                                        │
+       │                                        │
+       │      ┌─────────────┐                  │
+       │      │             │                  │
+       └─────►│  Restore    │◄─────────────────┘
+              │  Script     │
+              │             │
+              └─────────────┘
 ```
 
-## 👓 Recommended reading
+### Best Practices
 
-n8n is full of useful content for getting started quickly with its AI concepts
-and nodes. If you run into an issue, go to [support](#support).
+- **Regular Backups**: Schedule regular backups of your database, especially before making significant changes to your workflows or configurations.
+- **Version Control**: Keep your backup files in version control or a secure storage location.
+- **Test Restores**: Periodically test the restore process to ensure your backups are valid and the process works as expected.
+- **Backup Before Updates**: Always create a backup before updating n8n or any of its components.
 
-- [AI agents for developers: from theory to practice with n8n](https://blog.n8n.io/ai-agents/)
-- [Tutorial: Build an AI workflow in n8n](https://docs.n8n.io/advanced-ai/intro-tutorial/)
-- [Langchain Concepts in n8n](https://docs.n8n.io/advanced-ai/langchain/langchain-n8n/)
-- [Demonstration of key differences between agents and chains](https://docs.n8n.io/advanced-ai/examples/agent-chain-comparison/)
-- [What are vector databases?](https://docs.n8n.io/advanced-ai/examples/understand-vector-databases/)
-
-## 🎥 Video walkthrough
-
-- [Installing and using Local AI for n8n](https://www.youtube.com/watch?v=xz_X2N-hPg0)
-
-## 🛍️ More AI templates
-
-For more AI workflow ideas, visit the [**official n8n AI template
-gallery**](https://n8n.io/workflows/categories/ai/). From each workflow,
-select the **Use workflow** button to automatically import the workflow into
-your local n8n instance.
-
-### Learn AI key concepts
-
-- [AI Agent Chat](https://n8n.io/workflows/1954-ai-agent-chat/)
-- [AI chat with any data source (using the n8n workflow too)](https://n8n.io/workflows/2026-ai-chat-with-any-data-source-using-the-n8n-workflow-tool/)
-- [Chat with OpenAI Assistant (by adding a memory)](https://n8n.io/workflows/2098-chat-with-openai-assistant-by-adding-a-memory/)
-- [Use an open-source LLM (via Hugging Face)](https://n8n.io/workflows/1980-use-an-open-source-llm-via-huggingface/)
-- [Chat with PDF docs using AI (quoting sources)](https://n8n.io/workflows/2165-chat-with-pdf-docs-using-ai-quoting-sources/)
-- [AI agent that can scrape webpages](https://n8n.io/workflows/2006-ai-agent-that-can-scrape-webpages/)
-
-### Local AI templates
-
-- [Tax Code Assistant](https://n8n.io/workflows/2341-build-a-tax-code-assistant-with-qdrant-mistralai-and-openai/)
-- [Breakdown Documents into Study Notes with MistralAI and Qdrant](https://n8n.io/workflows/2339-breakdown-documents-into-study-notes-using-templating-mistralai-and-qdrant/)
-- [Financial Documents Assistant using Qdrant and](https://n8n.io/workflows/2335-build-a-financial-documents-assistant-using-qdrant-and-mistralai/) [Mistral.ai](http://mistral.ai/)
-- [Recipe Recommendations with Qdrant and Mistral](https://n8n.io/workflows/2333-recipe-recommendations-with-qdrant-and-mistral/)
-
-## Tips & tricks
-
-### Accessing local files
-
-The self-hosted AI starter kit will create a shared folder (by default,
-located in the same directory) which is mounted to the n8n container and
-allows n8n to access files on disk. This folder within the n8n container is
-located at `/data/shared` -- this is the path you’ll need to use in nodes that
-interact with the local filesystem.
-
-**Nodes that interact with the local filesystem**
-
-- [Read/Write Files from Disk](https://docs.n8n.io/integrations/builtin/core-nodes/n8n-nodes-base.filesreadwrite/)
-- [Local File Trigger](https://docs.n8n.io/integrations/builtin/core-nodes/n8n-nodes-base.localfiletrigger/)
-- [Execute Command](https://docs.n8n.io/integrations/builtin/core-nodes/n8n-nodes-base.executecommand/)
-
-## 📜 License
-
-This project is licensed under the Apache License 2.0 - see the
-[LICENSE](LICENSE) file for details.
-
-## 💬 Support
+## 💬 Support
 
 Join the conversation in the [n8n Forum](https://community.n8n.io/), where you
 can:
